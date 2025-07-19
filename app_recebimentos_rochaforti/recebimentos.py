@@ -19,6 +19,25 @@ def main(page: ft.Page):
     
 
     # FUNÇÕES
+
+
+    def atualizando_tabela_visual(e):
+        previa_tabela.rows.clear()
+        for index, linha_dados in recebimentos_df.iterrows():
+            adicionando_linha_tabela_visual = ft.DataRow(
+                cells=[
+                    ft.DataCell(ft.Text(str(linha_dados["N° Embalagem"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Peso Bruto (g)"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Produto"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Unidades Embalagem"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Peso s/Embalagem (g)"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Peso Ideal (g)"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Diferença de Peso (g)"]))),
+                    ft.DataCell(ft.Text(str(linha_dados["Diferença em Unidades do Produto"])))
+                ]
+            )
+            previa_tabela.rows.append(adicionando_linha_tabela_visual)
+
     
     def adicionando_embalagem(e):
         nonlocal numero_embalagem
@@ -29,58 +48,59 @@ def main(page: ft.Page):
         except( ValueError, TypeError):
             page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Peso' é inválido!", color="White"), open=True, bgcolor="Red"))
             page.update()
+            return
         except Exception as erro:
             print(erro.__class__)
+            return
 
         try:
             produto = str(input_produto.value)
+            if not produto:
+                raise ValueError
         except( ValueError, TypeError):
             page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Produto' é inválido!", color="White"), open=True, bgcolor="Red"))
             page.update()
+            return
         except Exception as erro:
             print(erro.__class__)
+            return
         
         try:
             peso_unitario = float(input_peso_unitario.value)
         except( ValueError, TypeError):
             page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Peso Unitário' é inválido!", color="White"), open=True, bgcolor="Red"))
             page.update()
+            return
         except Exception as erro:
             print(erro.__class__)
+            return
 
         try:
             peso_embalagem_vazia = float(input_peso_embalagem_vazia.value)
         except( ValueError, TypeError):
             page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Embalagem Vazia' é inválido!", color="White"), open=True, bgcolor="Red"))
             page.update()
+            return
         except Exception as erro:
             print(erro.__class__)
+            return
 
         try:
             unidades_por_embalagem = float(input_unidades_por_embalagem.value)
         except( ValueError, TypeError):
             page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Quantidade por Embalagem' é inválido!", color="White"), open=True, bgcolor="Red"))
             page.update()
+            return
         except Exception as erro:
             print(erro.__class__)
+            return
 
-        
-            
+        peso_sem_embalagem = peso - peso_embalagem_vazia
+        peso_ideal = unidades_por_embalagem * peso_unitario
+        diferença_peso = peso_ideal - peso_sem_embalagem
+        diferença_em_unidades = diferença_peso / peso_unitario
 
-
-           
-
-
-            
-
-
-            peso_sem_embalagem = peso - peso_embalagem_vazia
-            peso_ideal = unidades_por_embalagem * peso_unitario
-            diferença_peso = peso_ideal - peso_sem_embalagem
-            diferença_em_unidades = diferença_peso / peso_unitario
-
-
-            nova_embalagem = pd.DataFrame(
+        nova_embalagem = pd.DataFrame(
                 [
                     {
                         "N° Embalagem": f"Embalagem {numero_embalagem}",
@@ -95,9 +115,18 @@ def main(page: ft.Page):
                 ]
             )
 
-            nonlocal recebimentos_df
+        nonlocal recebimentos_df
+        try:
             recebimentos_df = pd.concat([recebimentos_df, nova_embalagem], ignore_index=True)
+            page.add(ft.SnackBar(content=ft.Text("Embalagem adicionada com sucesso !", color="White"), open=True, bgcolor="green"))
             print(recebimentos_df)
+            atualizando_tabela_visual()
+            page.update()
+        except:
+            page.add(ft.SnackBar(content=ft.Text("Erro ao adicionar Embalagem", color="White"), open=True, bgcolor="Red"))
+            page.update()
+            return
+                
 
        
             
@@ -157,7 +186,6 @@ def main(page: ft.Page):
             ft.DataColumn(ft.Text("Diferença de Peso (g)"),numeric=True),
             ft.DataColumn(ft.Text("Diferença em Unidades do Produto"),numeric=True)
         ],
-        bgcolor="yellow",
         
     )
 
@@ -165,12 +193,10 @@ def main(page: ft.Page):
     modal_previa_tabela = ft.AlertDialog(
         modal=True,
         title="Prévia da tabela",
-        content= ft.Container(
-            ft.Column(
-                controls=[
-                    previa_tabela
-                ]
-            ),alignment=ft.alignment.center,expand=True,padding=10
+        content= ft.Row(
+            controls=[
+                previa_tabela
+            ],scroll=ft.ScrollMode.ADAPTIVE
         ),
         actions=[
             ft.ElevatedButton("Fechar Tabela", on_click=lambda e: page.close(modal_previa_tabela),height=30,)
