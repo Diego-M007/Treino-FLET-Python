@@ -16,6 +16,15 @@ def main(page: ft.Page):
             "Diferença de Peso (g)",
             "Diferença em Unidades do Produto"
         ])
+
+        def salvar_arquivo_resultado(e: ft.FilePickerResultEvent):
+            pass
+
+        estilo_focado_erro = {
+            "focused_border_color": "red",
+            "focus_color": "red",
+            "focused_border_width": 2
+        }
         
 
         # FUNÇÕES
@@ -41,11 +50,14 @@ def main(page: ft.Page):
         
         def adicionando_embalagem(e):
             nonlocal numero_embalagem
-            numero_embalagem = numero_embalagem + 1
+            
 
             try:
                 peso = float(input_peso.value)
+                input_peso.focused_border_color = ""
             except( ValueError, TypeError):
+                input_peso.focused_border_color = "red"
+                input_peso.focus()
                 page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Peso' é inválido!", color="White"), open=True, bgcolor="Red"))
                 page.update()
                 return
@@ -54,10 +66,13 @@ def main(page: ft.Page):
                 return
 
             try:
-                produto = str(input_produto.value).lower
+                produto = str(input_produto.value)
+                input_produto.focused_border_color = ""
                 if not produto:
                     raise ValueError
             except( ValueError, TypeError):
+                input_produto.focused_border_color = "red"
+                input_produto.focus()
                 page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Produto' é inválido!", color="White"), open=True, bgcolor="Red"))
                 page.update()
                 return
@@ -67,7 +82,10 @@ def main(page: ft.Page):
             
             try:
                 peso_unitario = float(input_peso_unitario.value)
+                input_peso_unitario.focused_border_color = ""
             except( ValueError, TypeError):
+                input_peso_unitario.focused_border_color = "red"
+                input_peso_unitario.focus()
                 page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Peso Unitário' é inválido!", color="White"), open=True, bgcolor="Red"))
                 page.update()
                 return
@@ -77,7 +95,10 @@ def main(page: ft.Page):
 
             try:
                 peso_embalagem_vazia = float(input_peso_embalagem_vazia.value)
+                input_peso_embalagem_vazia.focused_border_color = ""
             except( ValueError, TypeError):
+                input_peso_embalagem_vazia.focused_border_color = "red"
+                input_peso_embalagem_vazia.focus()
                 page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Embalagem Vazia' é inválido!", color="White"), open=True, bgcolor="Red"))
                 page.update()
                 return
@@ -86,17 +107,22 @@ def main(page: ft.Page):
                 return
 
             try:
-                unidades_por_embalagem = float(input_unidades_por_embalagem.value)
+                unidades_por_embalagem = int(input_unidades_por_embalagem.value)
+                input_unidades_por_embalagem.focused_border_color = ""
             except( ValueError, TypeError):
+                input_unidades_por_embalagem.focused_border_color = "red"
+                input_unidades_por_embalagem.focus()
                 page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Quantidade por Embalagem' é inválido!", color="White"), open=True, bgcolor="Red"))
                 page.update()
                 return
             except Exception as erro:
                 print(erro.__class__)
                 return
+            
+            numero_embalagem = numero_embalagem + 1
 
             peso_sem_embalagem = peso - peso_embalagem_vazia
-            peso_ideal = unidades_por_embalagem * peso_unitario
+            peso_ideal = unidades_por_embalagem * peso_unitario - peso_embalagem_vazia
             diferença_peso = peso_ideal - peso_sem_embalagem
             diferença_em_unidades = diferença_peso / peso_unitario
 
@@ -105,7 +131,7 @@ def main(page: ft.Page):
                         {
                             "N° Embalagem": f"Embalagem {numero_embalagem}",
                             "Peso Bruto (g)": peso,
-                            "Produto": produto,
+                            "Produto": produto.lower(),
                             "Unidades Embalagem":unidades_por_embalagem,
                             "Peso s/Embalagem (g)": peso_sem_embalagem,
                             "Peso Ideal (g)": peso_ideal,
@@ -120,6 +146,8 @@ def main(page: ft.Page):
                 recebimentos_df = pd.concat([recebimentos_df, nova_embalagem], ignore_index=True)
                 page.add(ft.SnackBar(content=ft.Text("Embalagem adicionada com sucesso !", color="White"), open=True, bgcolor="green"))
                 print(recebimentos_df)
+                input_peso.value = ""
+                input_peso.focus()
                 try:
                     atualizando_tabela_visual()
                     page.update()
@@ -135,8 +163,86 @@ def main(page: ft.Page):
                 page.update()
                 return
             
-        def gerar_relatorio_excel():
-            pass
+
+        def verificar_tabela_vazia(e):
+            if recebimentos_df.empty:
+                page.add(ft.SnackBar(content=ft.Text("Adicione pelo menos uma embalagem antes de gerar um relatório !", color="White"), open=True, bgcolor="Red"))
+                page.update()
+                return
+            else:
+                page.open(modal_gerar_tabela)
+                page.update()
+
+        
+        def gerar_relatorio_excel(e):
+            try:
+                peso_esperado_bruto = float(input_peso_total_esperado.value)
+            except(ValueError, TypeError):
+                page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Peso Nota fiscal' é inválido!", color="White"), open=True, bgcolor="Red"))
+                page.update()
+                return
+            try:
+                Fornecedor = str(input_nome_Fornecedor.value)
+                if not Fornecedor:
+                    raise ValueError
+            except( ValueError, TypeError):
+                page.add(ft.SnackBar(content=ft.Text("Erro: O valor do campo 'Nome Fornecedor' é inválido!", color="White"), open=True, bgcolor="Red"))
+                page.update()
+                return
+            except Exception as erro:
+                print(erro.__class__)
+                return
+            
+            peso_total_esperado = peso_esperado_bruto * 1000
+            media_pesos_brutos = recebimentos_df["Peso Bruto (g)"].mean()
+            peso_total_recebido = recebimentos_df["Peso Bruto (g)"].sum()
+            diferenca_peso_total = peso_total_esperado - peso_total_recebido
+            quantidade_total_embalagens = len(recebimentos_df)
+            nome_produto = input_produto.value
+
+            dados_resumo = {
+            "Métrica": [
+                "Produto Recebido",
+                "Quantidade de Embalagens",
+                "Peso Total Esperado (g)",
+                "Peso Total Recebido (g)",
+                "Diferença vs. Nota Fiscal (g)",
+                "Peso Médio por Embalagem (g)"
+            ],
+            "Valor": [
+                nome_produto,
+                quantidade_total_embalagens,
+                peso_total_esperado,
+                peso_total_recebido,
+                diferenca_peso_total,
+                media_pesos_brutos
+            ]
+            }
+            resumo_df = pd.DataFrame(dados_resumo)
+            nome_arquivo = f"Relatório_Recebimento_{Fornecedor}_{pd.Timestamp.now().strftime('%Y-%m-%d')}.xlsx"
+            
+            try:
+                with pd.ExcelWriter(nome_arquivo, engine='openpyxl') as writer:
+                # Escreve o primeiro DataFrame na aba 'Detalhes'
+                    recebimentos_df.to_excel(writer, sheet_name='Detalhes do Recebimento', index=False)
+                    
+                    # Escreve o DataFrame de resumo na aba 'Resumo'
+                    resumo_df.to_excel(writer, sheet_name='Resumo', index=False)
+                print(f"\nRelatório com abas de Detalhes e Resumo salvo como '{nome_arquivo}'")
+                page.add(ft.SnackBar(content=ft.Text("Relatório gerado com sucesso !", color="White"), open=True, bgcolor="Green"))
+                page.update()
+            except Exception as Erro:
+                page.add(ft.SnackBar(content=ft.Text("Erro ao gerar relatório !", color="White"), open=True, bgcolor="Red"))
+                page.update()
+                print(Erro)
+                return
+
+                
+
+            
+
+
+
                     
 
         
@@ -152,14 +258,19 @@ def main(page: ft.Page):
             hint_text="Digite qual o peso da embalagem em gramas...",
             border=ft.InputBorder.OUTLINE,
             filled=True,
-            keyboard_type=ft.KeyboardType.NUMBER
+            keyboard_type=ft.KeyboardType.NUMBER,
+            on_submit=adicionando_embalagem
         )
+
+
         input_produto = ft.TextField(
             label="Produto",
             hint_text="Digite qual o produto...",
             border=ft.InputBorder.OUTLINE,
             filled=True
         )
+
+
         input_peso_unitario = ft.TextField(
             label="Peso Unitário (g)",
             hint_text="Digite o peso unitário do produto...",
@@ -167,6 +278,7 @@ def main(page: ft.Page):
             filled=True,
             keyboard_type=ft.KeyboardType.NUMBER
         )
+
         input_peso_embalagem_vazia = ft.TextField(
             label="Embalagem Vazia (g)",
             hint_text="Digite o peso da embalagem vazia...",
@@ -174,6 +286,7 @@ def main(page: ft.Page):
             filled=True,
             keyboard_type=ft.KeyboardType.NUMBER
         )
+
         input_unidades_por_embalagem = ft.TextField(
             label="Quantidade por Embalagem",
             hint_text="Digite a quantidade por embalagem...",
@@ -182,31 +295,39 @@ def main(page: ft.Page):
             keyboard_type=ft.KeyboardType.NUMBER
         )
 
-        input_peso_total = ft.TextField(
-            label="Peso Nota Fiscal (g)",
+        input_peso_total_esperado = ft.TextField(
+            label="Peso Nota Fiscal (Kg)",
             hint_text="Digite o peso informado na Nota Fiscal...",
-            border=ft.InputBorder.OUTLINE,
+            border=ft.InputBorder.UNDERLINE,
             filled=True,
             keyboard_type=ft.KeyboardType.NUMBER
-            ),
-
+        )
+        
         input_nome_Fornecedor = ft.TextField(
             label="Nome empresa fornecedora",
             hint_text="Digite o nome da Empresa fornecedora...",
-            border=ft.InputBorder.OUTLINE,
+            border=ft.InputBorder.UNDERLINE,
             filled=True,
             keyboard_type=ft.KeyboardType.TEXT
-            ),
+        )
 
         modal_gerar_tabela = ft.AlertDialog(
                 modal=True,
                 title="Informações para Gerar Tabela",
-                content= ft.Row(
-                    controls=[
-                        input_peso_total,
-                        input_nome_Fornecedor
-                    ]
-                )
+                content= ft.Container(
+                    content=
+                        ft.Column(
+                            controls=[
+                                input_peso_total_esperado,
+                                input_nome_Fornecedor,
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER
+                        ),alignment=ft.alignment.center
+                ),
+                actions=[
+                    ft.ElevatedButton("Gerar Relatório", on_click=gerar_relatorio_excel, height=30),
+                    ft.ElevatedButton("Cancelar", on_click=lambda e: page.close(modal_gerar_tabela), height=30)
+                ]
             )
 
 
@@ -237,7 +358,7 @@ def main(page: ft.Page):
                 ],scroll=ft.ScrollMode.ADAPTIVE
             ),
             actions=[
-                ft.ElevatedButton("Fechar Tabela", on_click=lambda e: page.close(modal_previa_tabela),height=30,)
+                ft.ElevatedButton("Fechar Tabela", on_click=lambda e: page.close(modal_previa_tabela),height=30,),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
 
@@ -255,25 +376,17 @@ def main(page: ft.Page):
             ),padding=5
         )
         btn_add_linha = ft.ElevatedButton(content=conteudo_btn_add, on_click=adicionando_embalagem)
-        btn_ver_tabela = ft.ElevatedButton("Ver Prévia da Tabela", on_click=lambda e: page.open(modal_previa_tabela),)
-        btn_gerar_relatorio = ft.ElevatedButton("Gerar Relatório Excel")
+        btn_ver_tabela = ft.ElevatedButton("Ver Prévia da Tabela", on_click=lambda e: page.open(modal_previa_tabela))
+        btn_gerar_relatorio = ft.ElevatedButton("Gerar Relatório Excel", on_click=verificar_tabela_vazia)
         
 
 
 
         # ADICIONANDO ELEMENTOS NA TELA
 
-        header = ft.Container(
-            content=ft.Column(
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Text("Recebimento Rocha Forti",size=100)
-                    ],alignment=ft.MainAxisAlignment.CENTER
-                )
-            ],height=100,alignment=ft.MainAxisAlignment.CENTER
-        )
-        )
+        header = ft.Container(content= ft.Text(
+            "Controle de Recebimentos - Rocha Forti", size=28, weight=ft.FontWeight.BOLD
+        ),height=100,alignment=ft.alignment.center, padding=20)
         
         inputs = ft.Container(
             content =  ft.Column(
@@ -299,7 +412,7 @@ def main(page: ft.Page):
             inputs, buttons
         ],expand=1)
 
-        page.add(header,layout_principal)
+        page.add(header,ft.Divider(),layout_principal)
 
 
-ft.app(target=main, assets_dir="assets")
+ft.app(target=main)
