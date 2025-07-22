@@ -17,9 +17,9 @@ def main(page: ft.Page):
             "Diferença em Unidades do Produto"
         ])
 
-        seletor_salvar_arquivo = ft.FilePicker(on_result=salvar_arquivo_resultado)
+        
 
-        page.overlay.append(seletor_salvar_arquivo)
+        
 
         estilo_focado_erro = {
             "focused_border_color": "red",
@@ -30,8 +30,83 @@ def main(page: ft.Page):
 
         # FUNÇÕES
 
+        def fechar_modal_gerar(e):
+            modal_gerar_tabela.open = False
+            page.update()
+
         def salvar_arquivo_resultado(e: ft.FilePickerResultEvent):
-            pass
+            
+            if e.path:
+                caminho_arquivo = e.path
+
+                try:
+                    peso_esperado_bruto = float(input_peso_total_esperado.value)
+                    Fornecedor = str(input_nome_Fornecedor.value)
+                    if not Fornecedor:
+                        raise ValueError
+                except( ValueError, TypeError):
+                    page.add(ft.SnackBar(content=ft.Text("Erro: Verifique se os campos estão corretos !", color="White"), open=True, bgcolor="Red"))
+                    page.update()
+                    return
+                except Exception as erro:
+                    print(erro.__class__)
+                    return
+
+                try:
+                    peso_total_esperado = peso_esperado_bruto * 1000
+                    media_pesos_brutos = recebimentos_df["Peso Bruto (g)"].mean()
+                    peso_total_recebido = recebimentos_df["Peso Bruto (g)"].sum()
+                    diferenca_peso_total = peso_total_esperado - peso_total_recebido
+                    quantidade_total_embalagens = len(recebimentos_df)
+                    nome_produto = recebimentos_df["Produto"].iloc[0]
+
+
+                    dados_resumo = {
+                        "Métrica": [
+                        "Produto Recebido",
+                        "Quantidade de Embalagens",
+                        "Peso Total Esperado (g)",
+                        "Peso Total Recebido (g)",
+                        "Diferença vs. Nota Fiscal (g)",
+                        "Peso Médio por Embalagem (g)"
+                    ],
+                    "Valor": [
+                        nome_produto,
+                        quantidade_total_embalagens,
+                        peso_total_esperado,
+                        peso_total_recebido,
+                        diferenca_peso_total,
+                        media_pesos_brutos
+                    ]
+                    }
+                    resumo_df = pd.DataFrame(dados_resumo)
+                except:
+                    page.add(ft.SnackBar(content=ft.Text("Erro ao criar relatório Resumo", color="White"), open=True, bgcolor="Red"))
+                    page.update()
+                    return
+                try:
+                    with pd.ExcelWriter(caminho_arquivo, engine='openpyxl') as writer:
+                        # Escreve o primeiro DataFrame na aba 'Detalhes'
+                        recebimentos_df.to_excel(writer, sheet_name='Detalhes do Recebimento', index=False)
+                        
+                        # Escreve o DataFrame de resumo na aba 'Resumo'
+                        resumo_df.to_excel(writer, sheet_name='Resumo', index=False)
+                    page.add(ft.SnackBar(content=ft.Text("Arquivo criado com sucesso !", color="White"), open=True, bgcolor="Green"))
+                    modal_gerar_tabela.open = False
+                    input_nome_Fornecedor.value = ""
+                    input_peso_total_esperado.value = ""
+                    page.update()
+                except:
+                    page.add(ft.SnackBar(content=ft.Text("Erro ao gerar arquivo Excel", color="White"), open=True, bgcolor="Red"))
+                    page.update()
+                    return
+            else:
+                page.add(ft.SnackBar(content=ft.Text("Relatório cancelado !", color="White"), open=True, bgcolor="Red"))
+                page.update()
+                return
+            
+        seletor_salvar_arquivo = ft.FilePicker(on_result=salvar_arquivo_resultado)
+        page.overlay.append(seletor_salvar_arquivo)
 
 
         def atualizando_tabela_visual():
@@ -197,36 +272,53 @@ def main(page: ft.Page):
                 print(erro.__class__)
                 return
             
-            peso_total_esperado = peso_esperado_bruto * 1000
-            media_pesos_brutos = recebimentos_df["Peso Bruto (g)"].mean()
-            peso_total_recebido = recebimentos_df["Peso Bruto (g)"].sum()
-            diferenca_peso_total = peso_total_esperado - peso_total_recebido
-            quantidade_total_embalagens = len(recebimentos_df)
-            nome_produto = input_produto.value
-
-            dados_resumo = {
-            "Métrica": [
-                "Produto Recebido",
-                "Quantidade de Embalagens",
-                "Peso Total Esperado (g)",
-                "Peso Total Recebido (g)",
-                "Diferença vs. Nota Fiscal (g)",
-                "Peso Médio por Embalagem (g)"
-            ],
-            "Valor": [
-                nome_produto,
-                quantidade_total_embalagens,
-                peso_total_esperado,
-                peso_total_recebido,
-                diferenca_peso_total,
-                media_pesos_brutos
-            ]
-            }
             seletor_salvar_arquivo.save_file(
                 dialog_title="Salvar Relatório Como...",
                 file_name=f"Relatorio_{input_nome_Fornecedor.value.strip()}_{pd.Timestamp.now().strftime('%Y-%m-%d')}.xlsx",
-                allowed_extensions=["xlsx"]
+                allowed_extensions=["xlsx"],
             )
+
+
+        def criar_novo_recebimento(e):
+            nonlocal recebimentos_df
+            nonlocal numero_embalagem
+            try:
+                    page.close(dlg_confirmar_novo_relatorio)
+                    numero_embalagem = 0
+                    recebimentos_df = pd.DataFrame(columns=[
+                        "N° Embalagem",
+                        "Peso Bruto (g)",
+                        "Produto",
+                        "Unidades Embalagem",
+                        "Peso s/Embalagem (g)",
+                        "Peso Ideal (g)",
+                        "Diferença de Peso (g)",
+                        "Diferença em Unidades do Produto"
+                    ])
+                    atualizando_tabela_visual()
+                    inputs = [
+                        input_nome_Fornecedor,
+                        input_unidades_por_embalagem,
+                        input_peso,
+                        input_peso_embalagem_vazia,
+                        input_peso_total_esperado,
+                        input_peso_unitario,
+                        input_produto,
+                    ]
+                    for campo in inputs:
+                        campo.value = ""
+                        page.update()
+                    
+                    input_peso.focus()
+                    page.add(ft.SnackBar(content=ft.Text("Campos limpos, tudo pronto para um novo recebimento !", color="White"), open=True, bgcolor="Green"))
+                    page.update()
+
+                    
+            except Exception as erro:
+                    page.add(ft.SnackBar(content=ft.Text(f"Erro ao criar um novo Relatório: {erro} ", color="White"), open=True, bgcolor="Red"))
+                    page.update()
+                    return
+            
             
             
 
@@ -319,7 +411,7 @@ def main(page: ft.Page):
                 ),
                 actions=[
                     ft.ElevatedButton("Gerar Relatório", on_click=gerar_relatorio_excel, height=30),
-                    ft.ElevatedButton("Cancelar", on_click=lambda e: page.close(modal_gerar_tabela), height=30)
+                    ft.ElevatedButton("Cancelar", on_click=lambda e: fechar_modal_gerar(e) , height=30)
                 ]
             )
 
@@ -354,11 +446,21 @@ def main(page: ft.Page):
                 ft.ElevatedButton("Fechar Tabela", on_click=lambda e: page.close(modal_previa_tabela),height=30,),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
-
-            
-            
             
 
+        )
+        
+        dlg_confirmar_novo_relatorio = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Criar Novo Relatório"),
+            content=ft.Text("Você tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.",size=20),
+            alignment=ft.alignment.center,
+            actions=[
+                ft.ElevatedButton("Cancelar", on_click=lambda e: page.close(dlg_confirmar_novo_relatorio),height=30,),
+                ft.ElevatedButton("Criar novo Relatório", on_click=lambda e: criar_novo_recebimento(e),height=30,)
+            ],
+            on_dismiss=lambda e: print("Dialog dismissed!"),
+            title_padding=ft.padding.all(25),
         )
 
         conteudo_btn_add = ft.Container(
@@ -371,6 +473,7 @@ def main(page: ft.Page):
         btn_add_linha = ft.ElevatedButton(content=conteudo_btn_add, on_click=adicionando_embalagem)
         btn_ver_tabela = ft.ElevatedButton("Ver Prévia da Tabela", on_click=lambda e: page.open(modal_previa_tabela))
         btn_gerar_relatorio = ft.ElevatedButton("Gerar Relatório Excel", on_click=verificar_tabela_vazia)
+        btn_criar_novo_relatorio = ft.ElevatedButton("Criar um novo Relatório", on_click=lambda e: page.open(dlg_confirmar_novo_relatorio))
         
 
 
@@ -394,7 +497,8 @@ def main(page: ft.Page):
             controls=[
                 btn_add_linha,
                 btn_ver_tabela,
-                btn_gerar_relatorio
+                btn_gerar_relatorio,
+                btn_criar_novo_relatorio
             ],width=200,alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER
         )
         )
