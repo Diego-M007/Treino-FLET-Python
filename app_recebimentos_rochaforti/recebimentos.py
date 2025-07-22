@@ -17,8 +17,9 @@ def main(page: ft.Page):
             "Diferença em Unidades do Produto"
         ])
 
-        def salvar_arquivo_resultado(e: ft.FilePickerResultEvent):
-            pass
+        seletor_salvar_arquivo = ft.FilePicker(on_result=salvar_arquivo_resultado)
+
+        page.overlay.append(seletor_salvar_arquivo)
 
         estilo_focado_erro = {
             "focused_border_color": "red",
@@ -28,6 +29,9 @@ def main(page: ft.Page):
         
 
         # FUNÇÕES
+
+        def salvar_arquivo_resultado(e: ft.FilePickerResultEvent):
+            pass
 
 
         def atualizando_tabela_visual():
@@ -218,24 +222,13 @@ def main(page: ft.Page):
                 media_pesos_brutos
             ]
             }
-            resumo_df = pd.DataFrame(dados_resumo)
-            nome_arquivo = f"Relatório_Recebimento_{Fornecedor}_{pd.Timestamp.now().strftime('%Y-%m-%d')}.xlsx"
+            seletor_salvar_arquivo.save_file(
+                dialog_title="Salvar Relatório Como...",
+                file_name=f"Relatorio_{input_nome_Fornecedor.value.strip()}_{pd.Timestamp.now().strftime('%Y-%m-%d')}.xlsx",
+                allowed_extensions=["xlsx"]
+            )
             
-            try:
-                with pd.ExcelWriter(nome_arquivo, engine='openpyxl') as writer:
-                # Escreve o primeiro DataFrame na aba 'Detalhes'
-                    recebimentos_df.to_excel(writer, sheet_name='Detalhes do Recebimento', index=False)
-                    
-                    # Escreve o DataFrame de resumo na aba 'Resumo'
-                    resumo_df.to_excel(writer, sheet_name='Resumo', index=False)
-                print(f"\nRelatório com abas de Detalhes e Resumo salvo como '{nome_arquivo}'")
-                page.add(ft.SnackBar(content=ft.Text("Relatório gerado com sucesso !", color="White"), open=True, bgcolor="Green"))
-                page.update()
-            except Exception as Erro:
-                page.add(ft.SnackBar(content=ft.Text("Erro ao gerar relatório !", color="White"), open=True, bgcolor="Red"))
-                page.update()
-                print(Erro)
-                return
+            
 
                 
 
